@@ -86,6 +86,10 @@ cmd_source_file_complete_cb(struct cmdq_item *item, void *data)
 	} else {
 		c->source_file_depth--;
 		log_debug("%s: depth now %u", __func__, c->source_file_depth);
+		if (c->flags & CLIENT_DEAD) {
+			cmd_source_file_free_data(cdata);
+			return (CMD_RETURN_NORMAL);
+		}
 	}
 
 	cfg_print_causes(item);
@@ -127,6 +131,10 @@ cmd_source_file_done(__unused struct client *oc, const char *path,
 
 	if (!closed)
 		return;
+	if (c != NULL && (c->flags & CLIENT_DEAD)) {
+		cmd_source_file_free_data(cdata);
+		return;
+	}
 
 	if (error != 0)
 		cmdq_error(item, "%s: %s", strerror(error), path);

@@ -56,12 +56,15 @@ const struct cmd_entry cmd_show_buffer_entry = {
 };
 
 static void
-cmd_save_buffer_done(__unused struct client *c, const char *path, int error,
+cmd_save_buffer_done(struct client *c, const char *path, int error,
     __unused int closed, __unused struct evbuffer *buffer, void *data)
 {
 	struct cmdq_item	*item = data;
+	struct client		*owner = cmdq_get_client(item);
 
-	if (!closed)
+	if (!closed ||
+	    (owner != NULL && (owner->flags & CLIENT_DEAD)) ||
+	    (c != NULL && (c->flags & CLIENT_DEAD)))
 		return;
 
 	if (error != 0)

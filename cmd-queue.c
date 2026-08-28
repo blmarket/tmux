@@ -801,7 +801,8 @@ cmdq_guard(struct cmdq_item *item, const char *guard, int flags)
 	long		 t = item->time;
 	u_int		 number = item->number;
 
-	if (c != NULL && (c->flags & CLIENT_CONTROL))
+	if (c != NULL && (c->flags & CLIENT_DEAD) == 0 &&
+	    (c->flags & CLIENT_CONTROL))
 		control_write_guard(c, guard, t, number, flags);
 }
 
@@ -809,6 +810,10 @@ cmdq_guard(struct cmdq_item *item, const char *guard, int flags)
 void
 cmdq_print_data(struct cmdq_item *item, struct evbuffer *evb)
 {
+	struct client	*c = item->client;
+
+	if (c != NULL && (c->flags & CLIENT_DEAD))
+		return;
 	server_client_print(item->client, 1, evb);
 }
 
@@ -847,6 +852,10 @@ cmdq_error(struct cmdq_item *item, const char *fmt, ...)
 	va_end(ap);
 
 	log_debug("%s: %s", __func__, msg);
+	if (c != NULL && (c->flags & CLIENT_DEAD)) {
+		free(msg);
+		return;
+	}
 
 	if (c == NULL) {
 		cmd_get_source(cmd, &file, &line);

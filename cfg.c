@@ -225,9 +225,18 @@ cfg_print_causes(struct cmdq_item *item)
 	u_int		 i;
 	char		*cause;
 
+	if (c == NULL || (c->flags & CLIENT_DEAD)) {
+		for (i = 0; i < cfg_ncauses; i++)
+			free(cfg_causes[i]);
+		free(cfg_causes);
+		cfg_causes = NULL;
+		cfg_ncauses = 0;
+		return;
+	}
+
 	for (i = 0; i < cfg_ncauses; i++) {
 		cause = cfg_causes[i];
-		if (c != NULL && (c->flags & CLIENT_CONTROL))
+		if (c->flags & CLIENT_CONTROL)
 			control_notify_write(c, "%%config-error %s", cause);
 		else
 			cmdq_print(item, "%s", cause);

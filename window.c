@@ -2450,15 +2450,18 @@ window_pane_input_callback(struct client *c, __unused const char *path,
 	size_t				 len = EVBUFFER_LENGTH(buffer);
 
 	wp = window_pane_find_by_id(cdata->wp);
-	if (cdata->file != NULL && (wp == NULL || c->flags & CLIENT_DEAD)) {
-		if (wp == NULL) {
+	if (cdata->file != NULL && !closed &&
+	    (wp == NULL || c == NULL || c->flags & CLIENT_DEAD)) {
+		if (wp == NULL && c != NULL) {
 			c->retval = 1;
 			c->flags |= CLIENT_EXIT;
 		}
 		file_cancel(cdata->file);
-	} else if (cdata->file == NULL || closed || error != 0) {
+	} else if (cdata->file == NULL || closed || error != 0 ||
+	    c == NULL || c->flags & CLIENT_DEAD) {
 		cmdq_continue(cdata->item);
-		server_client_unref(c);
+		if (c != NULL)
+			server_client_unref(c);
 		free(cdata);
 	} else
 		input_parse_buffer(wp, buf, len);

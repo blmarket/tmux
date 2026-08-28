@@ -51,11 +51,12 @@ struct cmd_load_buffer_data {
 };
 
 static void
-cmd_load_buffer_done(__unused struct client *c, const char *path, int error,
+cmd_load_buffer_done(struct client *c, const char *path, int error,
     int closed, struct evbuffer *buffer, void *data)
 {
 	struct cmd_load_buffer_data	*cdata = data;
 	struct client			*tc = cdata->client;
+	struct client			*owner = cmdq_get_client(cdata->item);
 	struct cmdq_item		*item = cdata->item;
 	void				*bdata = EVBUFFER_DATA(buffer);
 	size_t				 bsize = EVBUFFER_LENGTH(buffer);
@@ -64,6 +65,15 @@ cmd_load_buffer_done(__unused struct client *c, const char *path, int error,
 
 	if (!closed)
 		return;
+	/* cf->c is NULL for an attached client, so check the owner too. */
+	if ((owner != NULL && (owner->flags & CLIENT_DEAD)) ||
+	    (c != NULL && (c->flags & CLIENT_DEAD))) {
+		if (tc != NULL)
+			server_client_unref(tc);
+		free(cdata->name);
+		free(cdata);
+		return;
+	}
 
 	if (error != 0)
 		cmdq_error(item, "%s: %s", strerror(error), path);
@@ -78,9 +88,9 @@ cmd_load_buffer_done(__unused struct client *c, const char *path, int error,
 		    tc->session != NULL &&
 		    (~tc->flags & CLIENT_DEAD))
 			tty_set_selection(&tc->tty, "", copy, bsize);
-		if (tc != NULL)
-			server_client_unref(tc);
 	}
+	if (tc != NULL)
+		server_client_unref(tc);
 	cmdq_continue(item);
 
 	free(cdata->name);
